@@ -1,33 +1,19 @@
 from collections import Counter
 import itertools
+import json
 import os
 import random
 
 import altair as alt
-from PIL import Image
 import pandas as pd
+from PIL import Image
 import streamlit as st
 
-def check_password():
-    if "password_correct" not in st.session_state:
-        st.session_state["password_correct"] = False
-
-    if not st.session_state["password_correct"]:
-        password = st.text_input("パスワードを入力してください", type="password")
-        if st.button("ログイン"):
-            if password == "sanngaku913117":  # ← ここを好きなパスワードに変更
-                st.session_state["password_correct"] = True
-                st.rerun()
-            else:
-                st.error("パスワードが違います")
-        return False
-    return True
-
-# --- 修正後 ---
+# --- パス設定（相対パス） ---
 ICON_PATH_1 = "アイコン/1.png"
 ICON_PATH_2 = "アイコン/2.png"
 
-# アプリの基本設定
+# --- アプリ基本設定 ---
 if os.path.exists(ICON_PATH_1):
     app_icon = Image.open(ICON_PATH_1)
 else:
@@ -40,6 +26,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# --- CSS スタイリング ---
 st.markdown(
     """
     <style>
@@ -76,7 +63,6 @@ st.markdown(
         color: #000000 !important;
     }
 
-    /* サイドバーの背景色と固定スタイル */
     [data-testid="stSidebar"] {
         background-color: #DBC79C !important;
         border-right: 1px solid #C4B28B !important;
@@ -115,7 +101,6 @@ st.markdown(
         font-weight: 700 !important;
     }
 
-    /* ボタンの共通スタイリング */
     button[kind="primary"], 
     button[kind="secondary"],
     .stButton > button,
@@ -137,7 +122,6 @@ st.markdown(
         color: #FFFFFF !important;
     }
 
-    /* 表（データフレーム・テーブル） */
     [data-testid="stDataFrame"], 
     [data-testid="stTable"],
     div[data-testid="stDataFrame"] > div,
@@ -146,7 +130,6 @@ st.markdown(
         border: 1px solid #D0DAD0 !important;
     }
 
-    /* トグル・チェックボックスの強制色設定 */
     [data-testid="stCheckbox"], 
     [data-testid="stToggle"],
     .stToggle {
@@ -164,7 +147,6 @@ st.markdown(
         font-weight: 700 !important;
     }
 
-    /* タブの美観と動作 */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px !important;
         border-bottom: 2px solid #D0DAD0 !important;
@@ -203,7 +185,6 @@ st.markdown(
         border-radius: 8px !important;
     }
 
-    /* ダークモード時のドロップダウン/プルダウン文字色白・背景黒設定 */
     @media (prefers-color-scheme: dark) {
         div[data-baseweb="select"], 
         div[data-baseweb="select"] > div,
@@ -236,24 +217,26 @@ st.markdown(
 )
 
 
+# --- Google スプレッドシート接続機能 (環境変数対応) ---
 @st.cache_resource
 def connect_to_gsheet():
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
     ]
-    import json
-    import os
     import gspread
     from google.oauth2.service_account import Credentials
 
-    # Renderの環境変数を優先的に読み込み、無ければローカルファイルを読む
     if "CREDENTIALS_JSON" in os.environ:
         creds_dict = json.loads(os.environ["CREDENTIALS_JSON"])
-        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+        creds = Credentials.from_service_account_info(
+            creds_dict, scopes=scopes
+        )
     else:
         json_path = "credentials.json"
-        creds = Credentials.from_service_account_file(json_path, scopes=scopes)
+        creds = Credentials.from_service_account_file(
+            json_path, scopes=scopes
+        )
 
     client = gspread.authorize(creds)
     return client.open("山岳部")
@@ -266,7 +249,8 @@ except Exception as e:
     st.stop()
 
 
-@st.cache_data(ttl=60)
+# --- 高速化のためのキャッシュ付きデータ取得 ---
+@st.cache_data(ttl=300)
 def load_sheet_data(sheet_name):
     ws = spreadsheet.worksheet(sheet_name)
     return pd.DataFrame(ws.get_all_records())
@@ -294,7 +278,6 @@ def update_sheet_safely(sheet_name, df):
 
 
 def sort_by_hrno(df):
-    """HRNO（数値昇順）順に正確にソート"""
     if "HRNO" in df.columns:
         df["_hrno_temp"] = (
             pd.to_numeric(df["HRNO"], errors="coerce").fillna(9999).astype(int)
@@ -374,11 +357,10 @@ elif page == "名簿・設定":
         "共同装備設定",
     ])
 
- with tab1:
+    with tab1:
         st.subheader("生徒名簿一覧")
         df_student = load_sheet_data("名簿（生徒）")
 
-        # 表示・編集に必要な標準6カラムのみに絞り込む
         base_cols = ["HRNO", "名前", "学年", "性別", "係", "参加"]
         for col in base_cols:
             if col not in df_student.columns:
@@ -436,6 +418,7 @@ elif page == "名簿・設定":
                 num_rows="dynamic",
                 key="editor_student",
                 use_container_width=True,
+                hide_index=True,
             )
             if st.button("生徒名簿を保存"):
                 df_to_save = edited_student.copy()
@@ -449,8 +432,7 @@ elif page == "名簿・設定":
             df_display = df_student.copy()
             if "係" in df_display.columns:
                 df_display["係"] = df_display["係"].apply(serialize_list_col)
-            st.dataframe(df_display, use_container_width=True)
-
+            st.dataframe(df_display, use_container_width=True, hide_index=True)
 
     with tab2:
         st.subheader("先生・OB/OG名簿一覧")
@@ -477,6 +459,7 @@ elif page == "名簿・設定":
                 num_rows="dynamic",
                 key="editor_adult",
                 use_container_width=True,
+                hide_index=True,
             )
             if st.button("先生・OB/OG名簿を保存"):
                 df_to_save = edited_adult.fillna("")
@@ -484,7 +467,7 @@ elif page == "名簿・設定":
                 st.cache_data.clear()
                 st.toast("大人名簿を保存しました。")
         else:
-            st.dataframe(df_adult, use_container_width=True)
+            st.dataframe(df_adult, use_container_width=True, hide_index=True)
 
     with tab3:
         st.subheader("生徒用テント")
@@ -519,9 +502,12 @@ elif page == "名簿・設定":
                 num_rows="dynamic",
                 key="editor_tent_s",
                 use_container_width=True,
+                hide_index=True,
             )
         else:
-            st.dataframe(df_tent_student, use_container_width=True)
+            st.dataframe(
+                df_tent_student, use_container_width=True, hide_index=True
+            )
 
         st.subheader("先生・OB/OG用テント")
         df_tent_adult = load_sheet_data("テント（先生・OB/OG）")
@@ -533,6 +519,7 @@ elif page == "名簿・設定":
                 num_rows="dynamic",
                 key="editor_tent_a",
                 use_container_width=True,
+                hide_index=True,
             )
             if st.button("テント設定をすべて保存"):
                 df_s_save = edited_tent_student.fillna("")
@@ -544,7 +531,9 @@ elif page == "名簿・設定":
                 st.cache_data.clear()
                 st.toast("テント設定を保存しました。")
         else:
-            st.dataframe(df_tent_adult, use_container_width=True)
+            st.dataframe(
+                df_tent_adult, use_container_width=True, hide_index=True
+            )
 
     with tab4:
         st.subheader("班数・条件設定")
@@ -660,6 +649,7 @@ elif page == "名簿・設定":
                 num_rows="dynamic",
                 key="editor_gear",
                 use_container_width=True,
+                hide_index=True,
             )
             if st.button("共同装備設定を保存"):
                 df_to_save = edited_gear.fillna("")
@@ -667,7 +657,7 @@ elif page == "名簿・設定":
                 st.cache_data.clear()
                 st.toast("共同装備設定を保存しました。")
         else:
-            st.dataframe(df_gear, use_container_width=True)
+            st.dataframe(df_gear, use_container_width=True, hide_index=True)
 
 elif page == "班決め・共同装備振り分け":
     st.markdown(
@@ -679,7 +669,6 @@ elif page == "班決め・共同装備振り分け":
     MEAL_MARU = ["①", "②", "③", "④", "⑤", "⑥", "⑦"]
 
     def run_auto_grouping():
-        """1段階目：自動班決め"""
         df_students = load_sheet_data("名簿（生徒）")
         df_students = df_students[
             df_students["参加"].isin([True, 1, "TRUE", "true", "True"])
@@ -772,7 +761,6 @@ elif page == "班決め・共同装備振り分け":
         allocate_balanced_strict(all_members, act_labels, is_act=True)
         allocate_balanced_strict(all_members, meal_labels, is_act=False)
 
-        # テント班設定（生徒のみ対象）
         df_tents = load_sheet_data("テント（生徒）")
         df_tents_avail = df_tents[df_tents["状態"] == "利用可能"].copy()
         df_tents_avail["優先度"] = (
@@ -865,7 +853,6 @@ elif page == "班決め・共同装備振り分け":
         return res_df
 
     def get_gear_item_pool(current_df):
-        """共同装備設定に基づきアイテムプールを作成"""
         df_gears = load_sheet_data("共同装備")
         students_list = current_df.to_dict("records")
 
@@ -942,7 +929,6 @@ elif page == "班決め・共同装備振り分け":
         return item_pool
 
     def run_auto_gear_assignment(current_df):
-        """2段階目：自動共同装備振り分け（生徒のみを対象）"""
         all_list = current_df.to_dict("records")
         for s in all_list:
             s["係_list"] = deserialize_list_col(s.get("係", []))
@@ -1010,7 +996,6 @@ elif page == "班決め・共同装備振り分け":
 
     edit_mode_p3 = st.toggle("編集モードを有効にする", value=False)
 
-    # 初回読み込み時の初期データセット
     if "p3_data" not in st.session_state:
         df_students_init = load_sheet_data("名簿（生徒）")
         df_students_init = ensure_required_columns(df_students_init)
@@ -1051,12 +1036,10 @@ elif page == "班決め・共同装備振り分け":
     except Exception:
         tent_options = [""] + list(df_p3["テント班"].dropna().unique())
 
-    # 水平線(---)を消去し余白をカット
-
     tab_list = ["一覧表", "行動班詳細", "食事班詳細", "テント班詳細", "共同装備詳細"]
     tab1, tab2, tab3, tab4, tab5 = st.tabs(tab_list)
 
-with tab1:
+    with tab1:
         st.subheader("一覧表")
 
         if edit_mode_p3:
