@@ -374,9 +374,22 @@ elif page == "名簿・設定":
         "共同装備設定",
     ])
 
-    with tab1:
+ with tab1:
         st.subheader("生徒名簿一覧")
         df_student = load_sheet_data("名簿（生徒）")
+
+        # 表示・編集に必要な標準6カラムのみに絞り込む
+        base_cols = ["HRNO", "名前", "学年", "性別", "係", "参加"]
+        for col in base_cols:
+            if col not in df_student.columns:
+                if col == "参加":
+                    df_student[col] = True
+                elif col == "学年":
+                    df_student[col] = 1
+                else:
+                    df_student[col] = ""
+
+        df_student = df_student[base_cols].copy()
 
         if "HRNO" in df_student.columns:
             df_student["HRNO"] = df_student["HRNO"].astype(str).str.zfill(4)
@@ -428,7 +441,7 @@ elif page == "名簿・設定":
                 df_to_save = edited_student.copy()
                 if "係" in df_to_save.columns:
                     df_to_save["係"] = df_to_save["係"].apply(serialize_list_col)
-                df_to_save = df_to_save.fillna("")
+                df_to_save = df_to_save[base_cols].fillna("")
                 update_sheet_safely("名簿（生徒）", df_to_save)
                 st.cache_data.clear()
                 st.toast("生徒名簿を保存しました。")
@@ -437,6 +450,7 @@ elif page == "名簿・設定":
             if "係" in df_display.columns:
                 df_display["係"] = df_display["係"].apply(serialize_list_col)
             st.dataframe(df_display, use_container_width=True)
+
 
     with tab2:
         st.subheader("先生・OB/OG名簿一覧")
@@ -1042,11 +1056,11 @@ elif page == "班決め・共同装備振り分け":
     tab_list = ["一覧表", "行動班詳細", "食事班詳細", "テント班詳細", "共同装備詳細"]
     tab1, tab2, tab3, tab4, tab5 = st.tabs(tab_list)
 
-    with tab1:
+with tab1:
         st.subheader("一覧表")
 
         if edit_mode_p3:
-            col_btn1, col_btn2 = st.columns(2)
+            col_btn1, col_btn2, col_btn3 = st.columns(3)
             with col_btn1:
                 if st.button("① 自動班決め実行", key="p3_run_grouping"):
                     df_res = run_auto_grouping()
@@ -1062,6 +1076,21 @@ elif page == "班決め・共同装備振り分け":
                     st.session_state["p3_data"] = df_res
                     st.session_state["p3_item_pool"] = pool
                     st.toast("共同装備の自動振り分けを完了しました。")
+                    st.rerun()
+
+            with col_btn3:
+                if st.button("🔄 班・装備をリセット", key="p3_reset_all"):
+                    df_reset = st.session_state["p3_data"].copy()
+                    df_reset["行動班"] = ""
+                    df_reset["食事班"] = ""
+                    df_reset["テント班"] = ""
+                    df_reset["共同装備"] = [[] for _ in range(len(df_reset))]
+                    df_reset["重量"] = 0
+
+                    st.session_state["p3_data"] = df_reset
+                    st.session_state["p3_item_pool"] = []
+                    save_p3_to_gsheet(df_reset, target="all")
+                    st.toast("すべての班割り当てと共同装備をリセットしました。")
                     st.rerun()
 
         df_table = df_p3.copy()
