@@ -250,7 +250,7 @@ except Exception as e:
 
 
 # --- 高速化のためのキャッシュ付きデータ取得 ---
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=600)
 def load_sheet_data(sheet_name):
     ws = spreadsheet.worksheet(sheet_name)
     return pd.DataFrame(ws.get_all_records())
@@ -427,6 +427,8 @@ elif page == "名簿・設定":
                 df_to_save = df_to_save[base_cols].fillna("")
                 update_sheet_safely("名簿（生徒）", df_to_save)
                 st.cache_data.clear()
+                if "p3_data" in st.session_state:
+                    del st.session_state["p3_data"]
                 st.toast("生徒名簿を保存しました。")
         else:
             df_display = df_student.copy()
@@ -1114,7 +1116,6 @@ elif page == "班決め・共同装備振り分け":
         else:
             if edit_mode_p3:
                 st.info("各生徒の行動班を変更できます。")
-                has_act_changed = False
                 for idx, row in df_p3.iterrows():
                     col_name, col_sel = st.columns([1, 2])
                     with col_name:
@@ -1129,15 +1130,12 @@ elif page == "班決め・共同装備振り分け":
                             index=act_options.index(curr_act)
                             if curr_act in act_options
                             else 0,
-                            key=f"act_sel_{idx}_{curr_act}",
+                            key=f"act_sel_{idx}",
                             label_visibility="collapsed",
                         )
                         if new_act != curr_act:
                             df_p3.at[idx, "行動班"] = new_act
-                            has_act_changed = True
-                if has_act_changed:
-                    st.session_state["p3_data"] = df_p3
-                    st.rerun()
+                            st.session_state["p3_data"] = df_p3
                 st.markdown("---")
 
             cols = st.columns(max(len(act_groups), 1))
@@ -1171,7 +1169,6 @@ elif page == "班決め・共同装備振り分け":
         else:
             if edit_mode_p3:
                 st.info("各生徒の食事班を変更できます。")
-                has_meal_changed = False
                 for idx, row in df_p3.iterrows():
                     col_name, col_sel = st.columns([1, 2])
                     with col_name:
@@ -1186,15 +1183,12 @@ elif page == "班決め・共同装備振り分け":
                             index=meal_options.index(curr_meal)
                             if curr_meal in meal_options
                             else 0,
-                            key=f"meal_sel_{idx}_{curr_meal}",
+                            key=f"meal_sel_{idx}",
                             label_visibility="collapsed",
                         )
                         if new_meal != curr_meal:
                             df_p3.at[idx, "食事班"] = new_meal
-                            has_meal_changed = True
-                if has_meal_changed:
-                    st.session_state["p3_data"] = df_p3
-                    st.rerun()
+                            st.session_state["p3_data"] = df_p3
                 st.markdown("---")
 
             cols = st.columns(max(len(meal_groups), 1))
@@ -1230,7 +1224,6 @@ elif page == "班決め・共同装備振り分け":
         else:
             if edit_mode_p3:
                 st.info("各生徒・大人のテント班を変更できます。未割り当ての利用可能テントも選択可能です。")
-                has_tent_changed = False
                 for idx, row in df_p3.iterrows():
                     col_name, col_sel = st.columns([1, 2])
                     with col_name:
@@ -1250,15 +1243,12 @@ elif page == "班決め・共同装備振り分け":
                             f"{row['名前']} のテント班",
                             options=opts,
                             index=idx_val,
-                            key=f"tent_sel_{idx}_{curr_tent}",
+                            key=f"tent_sel_{idx}",
                             label_visibility="collapsed",
                         )
                         if new_tent != curr_tent:
                             df_p3.at[idx, "テント班"] = new_tent
-                            has_tent_changed = True
-                if has_tent_changed:
-                    st.session_state["p3_data"] = df_p3
-                    st.rerun()
+                            st.session_state["p3_data"] = df_p3
                 st.markdown("---")
 
             if tent_groups:
@@ -1299,7 +1289,6 @@ elif page == "班決め・共同装備振り分け":
                 st.info("各メンバーの共同装備を変更できます。未割り当ての該当装備も選択肢に表示されます。")
 
             display_df = df_p3.copy()
-            has_gear_changed = False
 
             other_selected_all = []
             for _, o_row in display_df.iterrows():
@@ -1374,12 +1363,11 @@ elif page == "班決め・共同装備振り分け":
                             f"{st_name} さんの共同装備",
                             options=my_options,
                             default=curr_gear,
-                            key=f"select_gear_{idx}_{','.join(curr_gear)}",
+                            key=f"select_gear_{idx}",
                             label_visibility="collapsed",
                         )
 
                         if set(new_selected) != set(curr_gear):
-                            has_gear_changed = True
                             new_weight = sum([
                                 i["weight"]
                                 for gname in new_selected
@@ -1388,6 +1376,7 @@ elif page == "班決め・共同装備振り分け":
                             ])
                             display_df.at[idx, "共同装備"] = new_selected
                             display_df.at[idx, "重量"] = new_weight
+                            st.session_state["p3_data"] = display_df
                     else:
                         gear_str = ", ".join(curr_gear) if curr_gear else "なし"
                         st.markdown(
@@ -1396,10 +1385,6 @@ elif page == "班決め・共同装備振り分け":
                         )
 
                 st.markdown("<hr style='margin: 12px 0; border-color: #E2E8E0;'>", unsafe_allow_html=True)
-
-            if has_gear_changed:
-                st.session_state["p3_data"] = display_df
-                st.rerun()
 
             st.markdown("---")
             st.markdown("### 個人重量グラフ")
