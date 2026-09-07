@@ -242,15 +242,19 @@ def connect_to_gsheet():
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
     ]
+    import json
+    import os
     import gspread
     from google.oauth2.service_account import Credentials
 
-    # 同じフォルダ内の credentials.json を直接参照
-    json_path = "credentials.json"
+    # Renderの環境変数を優先的に読み込み、無ければローカルファイルを読む
+    if "CREDENTIALS_JSON" in os.environ:
+        creds_dict = json.loads(os.environ["CREDENTIALS_JSON"])
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+    else:
+        json_path = "credentials.json"
+        creds = Credentials.from_service_account_file(json_path, scopes=scopes)
 
-    creds = Credentials.from_service_account_file(
-        json_path, scopes=scopes
-    )
     client = gspread.authorize(creds)
     return client.open("山岳部")
 
