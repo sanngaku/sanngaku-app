@@ -2,3 +2,6 @@ altair
 Pillow
 pandas
 streamlit
+streamlit
+gspread
+google-auth
