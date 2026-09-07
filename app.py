@@ -217,7 +217,7 @@ st.markdown(
 )
 
 
-# --- Google スプレッドシート接続機能 (環境変数対応) ---
+# --- Google スプレッドシート接続のキャッシュ化 ---
 @st.cache_resource
 def connect_to_gsheet():
     scopes = [
@@ -240,6 +240,15 @@ def connect_to_gsheet():
 
     client = gspread.authorize(creds)
     return client.open("山岳部")
+
+# 接続オブジェクトを取得
+spreadsheet = connect_to_gsheet()
+
+# --- データ読み込みのキャッシュ化（600秒間再利用） ---
+@st.cache_data(ttl=600)
+def load_sheet_data(sheet_name):
+    ws = spreadsheet.worksheet(sheet_name)
+    return pd.DataFrame(ws.get_all_records())
 
 
 try:
