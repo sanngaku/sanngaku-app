@@ -23,9 +23,9 @@ def check_password():
         return False
     return True
 
-# 画像の絶対パス定義
-ICON_PATH_1 = "/Users/oonoyusei/Desktop/sanngaku_app/アイコン/1.png"
-ICON_PATH_2 = "/Users/oonoyusei/Desktop/sanngaku_app/アイコン/2.png"
+# --- 修正後 ---
+ICON_PATH_1 = "アイコン/1.png"
+ICON_PATH_2 = "アイコン/2.png"
 
 # アプリの基本設定
 if os.path.exists(ICON_PATH_1):
